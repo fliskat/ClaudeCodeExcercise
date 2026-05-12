@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git workflow
+
+After every meaningful change, commit and push to GitHub immediately so work is never lost and the history is easy to revert.
+
+- Commit after each logical unit of work (a feature added, a bug fixed, a color changed — not batched together)
+- Write clean, descriptive commit messages: what changed and why, not just "update file"
+- Always push after committing: `git add <files> && git commit -m "..." && git push`
+
 ## Running the project
 
 Open `tictactoe.html` directly in a browser — no build step, no server required.
