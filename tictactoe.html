@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TIC TAC TOE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cx: #00f5ff;
+      --co: #ff2070;
+      --bg: #08080f;
+      --panel: rgba(12,12,28,0.97);
+      --cell: min(128px, 26vw);
+}
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Press Start 2P', monospace;
+      overflow: hidden;
+    }
+
+    /* Layered background: ambient glows + grid */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 20% 22%, rgba(0,245,255,0.055) 0, transparent 65%),
+        radial-gradient(ellipse 60% 45% at 80% 78%, rgba(255,32,112,0.055) 0, transparent 65%),
+        linear-gradient(rgba(0,245,255,0.032) 1px, transparent 1px) 0 0 / 48px 48px,
+        linear-gradient(90deg, rgba(0,245,255,0.032) 1px, transparent 1px) 0 0 / 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* CRT scanlines */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(transparent 0, transparent 3px, rgba(0,0,0,0.09) 3px, rgba(0,0,0,0.09) 4px);
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .wrap {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 24px; padding: 20px 16px;
+    }
+
+    /* ── TITLE ── */
+    h1 {
+      font-size: clamp(11px, 3.2vw, 20px);
+      letter-spacing: .45em;
+      color: #fff;
+      text-shadow:
+        0 0 10px rgba(0,245,255,.9),
+        0 0 30px rgba(0,245,255,.4),
+        0 0 70px rgba(0,245,255,.15);
+      animation: flicker 5s linear infinite;
+    }
+
+    @keyframes flicker {
+      0%,93%,95%,97%,100% { opacity: 1 }
+      94%,96% { opacity: .65 }
+    }
+
+    /* ── SCOREBOARD ── */
+    .scores {
+      display: flex; align-items: center; gap: 14px;
+      width: 100%; max-width: 400px;
+    }
+
+    .score {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; gap: 8px;
+      padding: 14px 10px;
+      background: var(--panel);
+      border: 1.5px solid;
+      transition: box-shadow .35s, border-color .35s;
+    }
+
+    .score.x { border-color: rgba(0,245,255,.2); }
+    .score.o { border-color: rgba(255,32,112,.2); }
+
+    .score.x.on {
+      border-color: var(--cx);
+      box-shadow: 0 0 20px rgba(0,245,255,.32), inset 0 0 14px rgba(0,245,255,.05);
+    }
+    .score.o.on {
+      border-color: var(--co);
+      box-shadow: 0 0 20px rgba(255,32,112,.32), inset 0 0 14px rgba(255,32,112,.05);
+    }
+
+    .slabel { font-size: 8px; letter-spacing: .1em; }
+    .score.x .slabel { color: var(--cx); text-shadow: 0 0 6px var(--cx); }
+    .score.o .slabel { color: var(--co); text-shadow: 0 0 6px var(--co); }
+
+    .sval {
+      font-family: 'Orbitron', sans-serif; font-weight: 900;
+      font-size: 44px; line-height: 1;
+    }
+    .score.x .sval { color: var(--cx); text-shadow: 0 0 12px var(--cx), 0 0 30px rgba(0,245,255,.4); }
+    .score.o .sval { color: var(--co); text-shadow: 0 0 12px var(--co), 0 0 30px rgba(255,32,112,.4); }
+
+    .vs { font-size: 10px; color: rgba(255,255,255,.16); flex-shrink: 0; }
+
+    /* ── STATUS ── */
+    .status {
+      font-size: clamp(7px, 1.8vw, 10px);
+      letter-spacing: .15em;
+      min-height: 1.6em;
+      text-align: center;
+      transition: color .2s, text-shadow .2s;
+    }
+
+    /* ── BOARD ── */
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, var(--cell));
+      grid-template-rows: repeat(3, var(--cell));
+      background: var(--panel);
+      position: relative;
+      box-shadow: 0 0 70px rgba(0,0,0,.9), 0 0 0 1px rgba(0,245,255,.07);
+    }
+
+    /* Grid lines */
+    .gl { position: absolute; pointer-events: none; z-index: 2; }
+    .gl.v {
+      width: 1.5px; height: calc(var(--cell)*3); top: 0;
+      background: linear-gradient(to bottom, transparent 3%, rgba(0,245,255,.42) 20%, rgba(0,245,255,.42) 80%, transparent 97%);
+      box-shadow: 0 0 8px rgba(0,245,255,.18);
+    }
+    .gl.h {
+      height: 1.5px; width: calc(var(--cell)*3); left: 0;
+      background: linear-gradient(to right, transparent 3%, rgba(0,245,255,.42) 20%, rgba(0,245,255,.42) 80%, transparent 97%);
+      box-shadow: 0 0 8px rgba(0,245,255,.18);
+    }
+    .gl.v1 { left: var(--cell); }
+    .gl.v2 { left: calc(var(--cell)*2); }
+    .gl.h1 { top: var(--cell); }
+    .gl.h2 { top: calc(var(--cell)*2); }
+
+    /* Cells */
+    .cell {
+      width: var(--cell); height: var(--cell);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; position: relative;
+      transition: background .12s;
+      z-index: 3;
+    }
+    .cell.taken  { cursor: default; }
+    .cell:not(.taken):hover { background: rgba(255,255,255,.022); }
+
+    /* ── MARKS ── */
+    .mk {
+      width: 52%; height: 52%;
+      position: absolute; pointer-events: none;
+      animation: pop .26s cubic-bezier(.34,1.56,.64,1) both;
+    }
+
+    @keyframes pop {
+      from { transform: scale(0) rotate(-110deg); opacity: 0; }
+      to   { transform: scale(1) rotate(0);       opacity: 1; }
+    }
+
+    .mk svg { width: 100%; height: 100%; overflow: visible; }
+
+    .mk.xm svg line {
+      stroke: var(--cx); stroke-width: 7; stroke-linecap: round;
+      filter: drop-shadow(0 0 5px #00f5ff) drop-shadow(0 0 14px #00f5ff);
+    }
+    .mk.om svg circle {
+      stroke: var(--co); stroke-width: 7; fill: none;
+      filter: drop-shadow(0 0 5px #ff2070) drop-shadow(0 0 14px #ff2070);
+    }
+
+    /* Win glow boost on winning cells */
+    .cell.win .mk.xm svg line {
+      filter: drop-shadow(0 0 8px #00f5ff) drop-shadow(0 0 25px #00f5ff) drop-shadow(0 0 4px #fff);
+    }
+    .cell.win .mk.om svg circle {
+      filter: drop-shadow(0 0 8px #ff2070) drop-shadow(0 0 25px #ff2070) drop-shadow(0 0 4px #fff);
+    }
+
+    /* Ghost (hover preview) */
+    .ghost {
+      width: 52%; height: 52%;
+      position: absolute; pointer-events: none;
+      opacity: 0; transition: opacity .12s;
+    }
+    .cell:not(.taken):hover .ghost { opacity: .16; }
+    .ghost svg { width: 100%; height: 100%; overflow: visible; }
+
+    /* Win line */
+    .wl {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      overflow: visible; pointer-events: none; z-index: 10;
+    }
+    .wl line {
+      stroke: #fff; stroke-width: 4; stroke-linecap: round;
+      filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 18px rgba(255,255,255,.55));
+    }
+    @keyframes drawLine { to { stroke-dashoffset: 0; } }
+
+    /* ── BUTTON ── */
+    .btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px; letter-spacing: .32em;
+      padding: 14px 26px;
+      background: transparent;
+      border: 1.5px solid rgba(0,245,255,.3);
+      color: rgba(0,245,255,.58);
+      cursor: pointer; transition: all .2s;
+      overflow: hidden; position: relative;
+    }
+    .btn::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(0,245,255,.07), transparent);
+      transform: translateX(-100%); transition: transform .4s;
+    }
+    .btn:hover {
+      border-color: var(--cx); color: #fff;
+      box-shadow: 0 0 18px rgba(0,245,255,.28);
+      text-shadow: 0 0 8px var(--cx);
+    }
+    .btn:hover::after { transform: translateX(100%); }
+    .btn:active { transform: scale(.97); }
+
+    /* ── WIN FLASH ── */
+    #flash {
+      position: fixed; inset: 0;
+      background: #fff;
+      opacity: 0; pointer-events: none; z-index: 999;
+    }
+    .flash-go { animation: fla .45s ease-out forwards; }
+    @keyframes fla { from { opacity: .55; } to { opacity: 0; } }
+  </style>
+</head>
+<body>
+
+<div id="flash"></div>
+
+<div class="wrap">
+  <h1>TIC·TAC·TOE</h1>
+
+  <div class="scores">
+    <div class="score x on" id="sx">
+      <div class="slabel">PLAYER X</div>
+      <div class="sval" id="sxv">0</div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="score o" id="so">
+      <div class="slabel">PLAYER O</div>
+      <div class="sval" id="sov">0</div>
+    </div>
+  </div>
+
+  <div class="status" id="st"></div>
+  <div id="board"></div>
+  <button class="btn" id="rBtn">[ NEW GAME ]</button>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const stEl    = document.getElementById('st');
+const sxvEl   = document.getElementById('sxv');
+const sovEl   = document.getElementById('sov');
+const sxEl    = document.getElementById('sx');
+const soEl    = document.getElementById('so');
+const flashEl = document.getElementById('flash');
+
+const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+let cells, turn, over;
+const sc = {X:0, O:0};
+
+function xHTML() {
+  return `<div class="mk xm"><svg viewBox="0 0 100 100">
+    <line x1="15" y1="15" x2="85" y2="85"/>
+    <line x1="85" y1="15" x2="15" y2="85"/>
+  </svg></div>`;
+}
+
+function oHTML() {
+  return `<div class="mk om"><svg viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="35"/>
+  </svg></div>`;
+}
+
+function ghostHTML() {
+  if (turn === 'X') {
+    return `<div class="ghost"><svg viewBox="0 0 100 100">
+      <line x1="15" y1="15" x2="85" y2="85" stroke="var(--cx)" stroke-width="7" stroke-linecap="round"/>
+      <line x1="85" y1="15" x2="15" y2="85" stroke="var(--cx)" stroke-width="7" stroke-linecap="round"/>
+    </svg></div>`;
+  }
+  return `<div class="ghost"><svg viewBox="0 0 100 100">
+    <circle cx="50" cy="50" r="35" stroke="var(--co)" stroke-width="7" fill="none"/>
+  </svg></div>`;
+}
+
+function render(winCombo) {
+  boardEl.innerHTML = '';
+
+  for (const c of ['v v1','v v2','h h1','h h2']) {
+    const d = document.createElement('div');
+    d.className = 'gl ' + c;
+    boardEl.appendChild(d);
+  }
+
+  cells.forEach((v, i) => {
+    const d = document.createElement('div');
+    const isWin = winCombo && winCombo.includes(i);
+    d.className = 'cell' + (v ? ' taken' : '') + (isWin ? ' win' : '');
+
+    if      (v === 'X') d.innerHTML = xHTML();
+    else if (v === 'O') d.innerHTML = oHTML();
+    else if (!over)     d.innerHTML = ghostHTML();
+
+    if (!v && !over) d.addEventListener('click', () => move(i));
+    boardEl.appendChild(d);
+  });
+
+  if (winCombo) {
+    const allCells = boardEl.querySelectorAll('.cell');
+    const cs  = allCells[0].offsetWidth;
+    const cx  = n => (n % 3) * cs + cs / 2;
+    const cy  = n => Math.floor(n / 3) * cs + cs / 2;
+    const [a,, c] = winCombo;
+    const x1 = cx(a), y1 = cy(a), x2 = cx(c), y2 = cy(c);
+    const len = Math.hypot(x2-x1, y2-y1);
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('class','wl');
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    Object.entries({x1,y1,x2,y2}).forEach(([k,val]) => line.setAttribute(k,val));
+    line.style.strokeDasharray  = len;
+    line.style.strokeDashoffset = len;
+    line.style.animation = 'drawLine .4s .06s ease-out forwards';
+    svg.appendChild(line);
+    boardEl.appendChild(svg);
+  }
+}
+
+function hud() {
+  if (over) return;
+  const isX = turn === 'X';
+  stEl.style.color      = isX ? 'var(--cx)' : 'var(--co)';
+  stEl.style.textShadow = `0 0 10px ${isX ? 'var(--cx)' : 'var(--co)'}`;
+  stEl.textContent      = `PLAYER ${turn} — YOUR TURN`;
+  sxEl.classList.toggle('on',  isX);
+  soEl.classList.toggle('on', !isX);
+}
+
+function checkWin() {
+  for (const [a,b,c] of WINS) {
+    if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) return [a,b,c];
+  }
+  return null;
+}
+
+function move(i) {
+  if (over || cells[i]) return;
+  cells[i] = turn;
+
+  const win  = checkWin();
+  const draw = !win && cells.every(Boolean);
+
+  if (!win && !draw) {
+    turn = turn === 'X' ? 'O' : 'X';
+    render();
+    hud();
+    return;
+  }
+
+  over = true;
+  render(win);
+  sxEl.classList.remove('on');
+  soEl.classList.remove('on');
+
+  if (win) {
+    const w = cells[win[0]];
+    sc[w]++;
+    sxvEl.textContent = sc.X;
+    sovEl.textContent = sc.O;
+    const col = w === 'X' ? 'var(--cx)' : 'var(--co)';
+    stEl.style.color      = '#fff';
+    stEl.style.textShadow = `0 0 14px ${col}, 0 0 28px ${col}`;
+    stEl.textContent = `PLAYER ${w} WINS!`;
+    flashEl.classList.remove('flash-go');
+    void flashEl.offsetWidth;
+    flashEl.classList.add('flash-go');
+  } else {
+    stEl.style.color      = 'rgba(255,255,255,.38)';
+    stEl.style.textShadow = 'none';
+    stEl.textContent      = '— DRAW —';
+  }
+}
+
+function newGame() {
+  cells = Array(9).fill(null);
+  turn  = 'X';
+  over  = false;
+  render();
+  hud();
+}
+
+document.getElementById('rBtn').addEventListener('click', newGame);
+newGame();
+</script>
+
+</body>
+</html>
