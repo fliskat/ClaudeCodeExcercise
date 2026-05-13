@@ -1,324 +1,287 @@
 """
-Adds a Future State Architecture slide to Presentation5.pptx.
-Layout: Source Systems → Incorta Connectors → Incorta (central) → Consumption & AI
-ACDC Schema includes two new boxes: Golden Record & Customer Hierarchy
-SQL and Python Script labels on connector arrows.
+v2 – Fixed layout: no overlaps, clean vertical boxes, neutral source system color.
 """
 
 from pptx import Presentation
-from pptx.util import Inches, Pt, Emu
+from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.oxml.ns import qn
 from lxml import etree
-import copy
 
 INPUT  = "/Users/ratnadeep.bose/Downloads/Epredia Temp Doc/Presentation5.pptx"
 OUTPUT = "/Users/ratnadeep.bose/Downloads/Epredia Temp Doc/Epredia_Future_State_Architecture.pptx"
 
-# ── Colour palette (Midnight Executive) ──────────────────────────────────────
-C_NAVY      = RGBColor(0x1E, 0x27, 0x61)   # dominant navy
-C_TEAL      = RGBColor(0x02, 0x80, 0x90)   # Incorta accent
-C_ICE       = RGBColor(0xCA, 0xDC, 0xFC)   # light fill
-C_GOLD      = RGBColor(0xF5, 0xA6, 0x23)   # SQL/script connector labels
-C_GREEN     = RGBColor(0x1A, 0x7A, 0x4A)   # new boxes (Golden Record / Cust Hier)
-C_WHITE     = RGBColor(0xFF, 0xFF, 0xFF)
-C_DARK_GREY = RGBColor(0x2B, 0x2B, 0x2B)
-C_LIGHT_BG  = RGBColor(0xF0, 0xF4, 0xFF)
-C_SEC_BAR   = RGBColor(0x36, 0x45, 0x4F)
+# ── Palette ───────────────────────────────────────────────────────────────────
+C_NAVY    = RGBColor(0x1E, 0x27, 0x61)
+C_TEAL    = RGBColor(0x02, 0x80, 0x90)
+C_TEAL_DK = RGBColor(0x02, 0x50, 0x70)
+C_GOLD    = RGBColor(0xE8, 0x9A, 0x0C)
+C_GREEN   = RGBColor(0x1A, 0x7A, 0x4A)
+C_SRC     = RGBColor(0x60, 0x68, 0x78)   # neutral slate-gray for source systems
+C_SRC_BDR = RGBColor(0x90, 0x98, 0xAA)
+C_WHITE   = RGBColor(0xFF, 0xFF, 0xFF)
+C_OFFWHT  = RGBColor(0xF0, 0xF4, 0xFF)
+C_ICE     = RGBColor(0xDC, 0xEC, 0xF8)
+C_SECBAR  = RGBColor(0x36, 0x45, 0x4F)
+C_DARK    = RGBColor(0x1A, 0x1A, 0x2A)
 
 
-def rgb(color: RGBColor):
-    return f"{color.rgb:06X}"
-
-
-def add_rect(slide, l, t, w, h, fill_color, border_color=None, border_pt=1.5, radius=None):
-    """Add a rectangle shape and return it."""
-    shape = slide.shapes.add_shape(
-        1,  # MSO_SHAPE_TYPE.RECTANGLE
-        Inches(l), Inches(t), Inches(w), Inches(h)
-    )
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def add_rect(slide, l, t, w, h, fill, border=None, bpt=1.5, rounded=False):
+    shape = slide.shapes.add_shape(1, Inches(l), Inches(t), Inches(w), Inches(h))
     shape.fill.solid()
-    shape.fill.fore_color.rgb = fill_color
-    if border_color:
-        shape.line.color.rgb = border_color
-        shape.line.width = Pt(border_pt)
+    shape.fill.fore_color.rgb = fill
+    if border:
+        shape.line.color.rgb = border
+        shape.line.width = Pt(bpt)
     else:
         shape.line.fill.background()
-    if radius:
-        # Add rounded corners via XML
+    if rounded:
         sp = shape.element
         spPr = sp.find(qn("p:spPr"))
-        prstGeom = spPr.find(qn("a:prstGeom"))
-        if prstGeom is not None:
-            prstGeom.attrib["prst"] = "roundRect"
-            avLst = prstGeom.find(qn("a:avLst"))
-            if avLst is None:
-                avLst = etree.SubElement(prstGeom, qn("a:avLst"))
-            gd = etree.SubElement(avLst, qn("a:gd"))
+        pg = spPr.find(qn("a:prstGeom"))
+        if pg is not None:
+            pg.attrib["prst"] = "roundRect"
+            av = pg.find(qn("a:avLst"))
+            if av is None:
+                av = etree.SubElement(pg, qn("a:avLst"))
+            gd = etree.SubElement(av, qn("a:gd"))
             gd.set("name", "adj")
-            gd.set("fmla", f"val {radius}")
+            gd.set("fmla", "val 25000")
     return shape
 
 
-def set_text(shape, text, font_size=9, bold=False, color=C_WHITE, align=PP_ALIGN.CENTER, wrap=True):
+def txt(shape, text, sz=9, bold=False, color=C_WHITE, align=PP_ALIGN.CENTER):
     tf = shape.text_frame
-    tf.word_wrap = wrap
+    tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     p = tf.paragraphs[0]
     p.alignment = align
-    from pptx.util import Pt
-    run = p.add_run()
-    run.text = text
-    run.font.size = Pt(font_size)
-    run.font.bold = bold
-    run.font.color.rgb = color
-    # Vertical centre
-    from pptx.enum.text import MSO_ANCHOR
-    tf.auto_size = None
-    tf.word_wrap = wrap
-    shape.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+    r = p.add_run()
+    r.text = text
+    r.font.size = Pt(sz)
+    r.font.bold = bold
+    r.font.color.rgb = color
 
 
-def add_label(slide, l, t, w, h, text, font_size=7.5, bold=False,
-               color=C_DARK_GREY, align=PP_ALIGN.CENTER):
-    """Transparent label box."""
+def lbl(slide, l, t, w, h, text, sz=7.5, bold=False,
+        color=C_DARK, align=PP_ALIGN.CENTER):
     shape = slide.shapes.add_textbox(Inches(l), Inches(t), Inches(w), Inches(h))
     tf = shape.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
     p.alignment = align
-    run = p.add_run()
-    run.text = text
-    run.font.size = Pt(font_size)
-    run.font.bold = bold
-    run.font.color.rgb = color
+    r = p.add_run()
+    r.text = text
+    r.font.size = Pt(sz)
+    r.font.bold = bold
+    r.font.color.rgb = color
     return shape
 
 
-def add_arrow(slide, x1, y1, x2, y2, color=C_NAVY, width_pt=1.5):
-    """Draw a connector line with arrowhead."""
-    from pptx.util import Emu
-    cx = slide.shapes._spTree
-
-    # Build freeform connector in XML
+def arrow(slide, x1, y1, x2, y2, color=C_NAVY, wpt=1.5):
     x1e, y1e = int(Inches(x1)), int(Inches(y1))
     x2e, y2e = int(Inches(x2)), int(Inches(y2))
-    w = abs(x2e - x1e) or 1
-    h = abs(y2e - y1e) or 1
-    off_x = min(x1e, x2e)
-    off_y = min(y1e, y2e)
-
-    # local coords
-    lx1 = x1e - off_x
-    ly1 = y1e - off_y
-    lx2 = x2e - off_x
-    ly2 = y2e - off_y
-
+    ox, oy = min(x1e, x2e), min(y1e, y2e)
+    cw = max(abs(x2e - x1e), 1)
+    ch = max(abs(y2e - y1e), 1)
+    lx1, ly1 = x1e - ox, y1e - oy
+    lx2, ly2 = x2e - ox, y2e - oy
     clr = str(color)
-    w_emu = int(Pt(width_pt).pt * 12700)
-
+    we = int(Pt(wpt).pt * 12700)
     xml = f"""<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
-              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
-              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <p:nvSpPr>
-    <p:cNvPr id="9999" name="arrow"/>
-    <p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>
-    <p:nvPr/>
-  </p:nvSpPr>
+      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+      xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="9998" name="arr"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr/></p:nvSpPr>
   <p:spPr>
-    <a:xfrm>
-      <a:off x="{off_x}" y="{off_y}"/>
-      <a:ext cx="{w}" cy="{h}"/>
-    </a:xfrm>
+    <a:xfrm><a:off x="{ox}" y="{oy}"/><a:ext cx="{cw}" cy="{ch}"/></a:xfrm>
     <a:prstGeom prst="line"><a:avLst/></a:prstGeom>
-    <a:ln w="{w_emu}">
-      <a:solidFill><a:srgbClr val="{clr}"/></a:solidFill>
-      <a:tailEnd type="arrow"/>
-    </a:ln>
+    <a:ln w="{we}"><a:solidFill><a:srgbClr val="{clr}"/></a:solidFill><a:tailEnd type="arrow"/></a:ln>
   </p:spPr>
   <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
 </p:sp>"""
-    sp = etree.fromstring(xml)
-    cx.append(sp)
+    slide.shapes._spTree.append(etree.fromstring(xml))
 
 
-# ── Build slide ───────────────────────────────────────────────────────────────
+# ── Slide setup ───────────────────────────────────────────────────────────────
 prs = Presentation(INPUT)
-slide_layout = prs.slide_layouts[6]  # blank
-slide = prs.slides.add_slide(slide_layout)
+slide = prs.slides.add_slide(prs.slide_layouts[6])   # blank
 
-W, H = 13.33, 7.5   # inches (16:9 widescreen)
+# ── Grid constants ────────────────────────────────────────────────────────────
+# Columns (x, width)
+C1x, C1w = 0.10, 2.15   # Source Systems
+C2x, C2w = 2.35, 1.95   # Incorta Connectors
+SQL_x    = 4.35          # SQL label zone center (gap = 4.30–4.65)
+C3x, C3w = 4.65, 4.20   # Incorta (central)
+PY_x     = 8.92          # Python/SQL label zone center (gap = 8.90–9.25)
+C4x, C4w = 9.25, 3.95   # Consumption & AI
 
-# Background
-bg = add_rect(slide, 0, 0, W, H, C_LIGHT_BG)
+# Rows
+Y_TITLE   = 0.00;  H_TITLE  = 0.48
+Y_HEADER  = 0.52;  H_HEADER = 0.30
+Y_CONTENT = 0.90;  H_CONTENT = 6.20   # 0.90 → 7.10
+Y_SEC     = 7.12;  H_SEC    = 0.30
 
-# ── Title bar ──────────────────────────────────────────────────────────────
-title_bar = add_rect(slide, 0, 0, W, 0.55, C_NAVY)
-add_label(slide, 0.15, 0.08, 11, 0.42,
-          "Epredia Future State Data Architecture — Incorta as Central Platform",
-          font_size=13, bold=True, color=C_WHITE, align=PP_ALIGN.LEFT)
+# ── Background ────────────────────────────────────────────────────────────────
+add_rect(slide, 0, 0, 13.33, 7.5, C_OFFWHT)
 
-# ── Column headers ────────────────────────────────────────────────────────
-col_headers = [
-    (0.15,  "SOURCE SYSTEMS"),
-    (2.85,  "INCORTA CONNECTORS"),
-    (5.25,  "INCORTA  (Central Platform)"),
-    (9.75,  "CONSUMPTION & AI"),
+# ── Title bar ──────────────────────────────────────────────────────────────────
+add_rect(slide, 0, Y_TITLE, 13.33, H_TITLE, C_NAVY)
+lbl(slide, 0.18, 0.06, 12.80, 0.36,
+    "Epredia  |  Future State Data Architecture  —  Incorta as Central Platform",
+    sz=13, bold=True, color=C_WHITE, align=PP_ALIGN.LEFT)
+
+# ── Column headers ─────────────────────────────────────────────────────────────
+for x, w, label in [
+    (C1x, C1w, "SOURCE SYSTEMS"),
+    (C2x, C2w, "INCORTA CONNECTORS"),
+    (C3x, C3w, "INCORTA  (Central Platform)"),
+    (C4x, C4w, "CONSUMPTION & AI"),
+]:
+    b = add_rect(slide, x, Y_HEADER, w, H_HEADER, C_NAVY, rounded=True)
+    txt(b, label, sz=7.5, bold=True, color=C_WHITE)
+
+# ── Source system boxes (5 rows, evenly distributed) ─────────────────────────
+SRC_ITEMS = [
+    "ERP\n(SAP)",
+    "CRM\n(Salesforce /\nServiceMax)",
+    "Internal Data\n(SharePoint)",
+    "Files & APIs\n(External Data)",
+    "Email\nAttachments",
 ]
-for x, label in col_headers:
-    hdr = add_rect(slide, x, 0.65, 2.5 if x < 5 else (4.3 if x == 5.25 else 3.4), 0.32, C_NAVY, radius=20000)
-    set_text(hdr, label, font_size=7.5, bold=True, color=C_WHITE)
+N_SRC   = len(SRC_ITEMS)
+SRC_H   = 0.92                                        # box height
+SRC_GAP = (H_CONTENT - N_SRC * SRC_H) / (N_SRC - 1) # even gap
 
-# Fix widths per column
-add_rect(slide, 0.15,  0.65, 2.55, 0.32, C_NAVY, radius=20000)
-add_rect(slide, 2.85,  0.65, 2.25, 0.32, C_NAVY, radius=20000)
-add_rect(slide, 5.25,  0.65, 4.30, 0.32, C_NAVY, radius=20000)
-add_rect(slide, 9.75,  0.65, 3.40, 0.32, C_NAVY, radius=20000)
+src_y = []
+for i, label in enumerate(SRC_ITEMS):
+    y = Y_CONTENT + i * (SRC_H + SRC_GAP)
+    src_y.append(y)
+    b = add_rect(slide, C1x, y, C1w, SRC_H, C_SRC, C_SRC_BDR, bpt=1.2, rounded=True)
+    txt(b, label, sz=9, bold=True, color=C_WHITE)
 
-# ── SOURCE SYSTEMS (col 1) ────────────────────────────────────────────────
-sources = [
-    ("ERP\n(SAP)",                     C_NAVY),
-    ("CRM\n(Salesforce / ServiceMax)", C_NAVY),
-    ("Internal Data\n(SharePoint)",    C_NAVY),
-    ("Files & APIs\n(External Data)",  C_NAVY),
-    ("Email\nAttachments",             C_NAVY),
-]
-src_x, src_w, src_h = 0.18, 2.45, 0.70
-src_y_start = 1.10
-src_gap = 0.85
-
-for i, (label, color) in enumerate(sources):
-    y = src_y_start + i * src_gap
-    b = add_rect(slide, src_x, y, src_w, src_h, color, C_ICE, border_pt=1.2, radius=30000)
-    set_text(b, label, font_size=9, bold=True, color=C_WHITE)
-
-# ── INCORTA CONNECTORS (col 2) ────────────────────────────────────────────
-connectors = [
+# ── Incorta connector boxes (same y as source boxes) ──────────────────────────
+CON_ITEMS = [
     "SAP Connector\n(Marketplace)",
     "Salesforce Connector\n(Marketplace)",
     "SharePoint Connector\n(Marketplace)",
     "REST / API Connector\n(Python Script)",
-    "Power Automate\n→ SharePoint → Incorta",
+    "Power Automate\n→ SharePoint\n→ Incorta",
 ]
-con_x, con_w, con_h = 2.88, 2.20, 0.70
+for i, label in enumerate(CON_ITEMS):
+    y = src_y[i]
+    b = add_rect(slide, C2x, y, C2w, SRC_H, C_TEAL, C_WHITE, bpt=1.0, rounded=True)
+    txt(b, label, sz=8.5, bold=False, color=C_WHITE)
 
-for i, label in enumerate(connectors):
-    y = src_y_start + i * src_gap
-    b = add_rect(slide, con_x, y, con_w, con_h, C_TEAL, C_WHITE, border_pt=1.0, radius=25000)
-    set_text(b, label, font_size=8, bold=False, color=C_WHITE)
-
-# ── INCORTA CENTRAL BOX ───────────────────────────────────────────────────
-inc_x, inc_y, inc_w, inc_h = 5.28, 1.00, 4.28, 5.90
-incorta_bg = add_rect(slide, inc_x, inc_y, inc_w, inc_h, C_WHITE, C_TEAL, border_pt=2.5, radius=18000)
-
-# Incorta label at top of central box
-inc_title = add_rect(slide, inc_x + 0.05, inc_y + 0.05, inc_w - 0.10, 0.40, C_TEAL, radius=15000)
-set_text(inc_title, "INCORTA", font_size=13, bold=True, color=C_WHITE)
-
-# ── ACDC Schema sub-box ───────────────────────────────────────────────────
-acdc_x, acdc_y = inc_x + 0.15, inc_y + 0.58
-acdc_w, acdc_h = inc_w - 0.30, 2.65
-acdc_box = add_rect(slide, acdc_x, acdc_y, acdc_w, acdc_h, C_ICE, C_NAVY, border_pt=1.5, radius=12000)
-add_label(slide, acdc_x + 0.08, acdc_y + 0.04, acdc_w - 0.16, 0.25,
-          "ACDC Schema", font_size=8.5, bold=True, color=C_NAVY)
-
-# Raw Data Tables box
-rdt = add_rect(slide, acdc_x + 0.12, acdc_y + 0.32, acdc_w - 0.24, 0.46,
-               C_NAVY, C_WHITE, border_pt=1.0, radius=10000)
-set_text(rdt, "Raw Data Tables", font_size=9, bold=True, color=C_WHITE)
-
-# Golden Record (NEW - smaller)
-gr = add_rect(slide, acdc_x + 0.12, acdc_y + 0.88, (acdc_w - 0.36) / 2, 0.55,
-              C_GREEN, C_WHITE, border_pt=1.2, radius=10000)
-set_text(gr, "Golden\nRecord", font_size=8.5, bold=True, color=C_WHITE)
-
-# Customer Hierarchy (NEW - smaller)
-ch = add_rect(slide, acdc_x + 0.12 + (acdc_w - 0.36) / 2 + 0.12,
-              acdc_y + 0.88, (acdc_w - 0.36) / 2, 0.55,
-              C_GREEN, C_WHITE, border_pt=1.2, radius=10000)
-set_text(ch, "Customer\nHierarchy", font_size=8.5, bold=True, color=C_WHITE)
-
-# NEW badges
-add_label(slide, acdc_x + 0.12,                            acdc_y + 0.88 - 0.18, 1.2, 0.20,
-          "★ NEW", font_size=7, bold=True, color=C_GREEN)
-add_label(slide, acdc_x + 0.12 + (acdc_w - 0.36) / 2 + 0.12, acdc_y + 0.88 - 0.18, 1.2, 0.20,
-          "★ NEW", font_size=7, bold=True, color=C_GREEN)
-
-# Label: Python Script under golden record boxes
-add_label(slide, acdc_x + 0.08, acdc_y + 1.50, acdc_w - 0.16, 0.22,
-          "populated via Python Script / PySpark", font_size=7, bold=False, color=C_TEAL,
-          align=PP_ALIGN.CENTER)
-
-# ── Business Schema box ───────────────────────────────────────────────────
-bs_y = inc_y + 0.58 + acdc_h + 0.12
-bs = add_rect(slide, inc_x + 0.15, bs_y, inc_w - 0.30, 0.50, C_NAVY, C_WHITE, border_pt=1.0, radius=10000)
-set_text(bs, "Business Schema", font_size=9, bold=True, color=C_WHITE)
-add_label(slide, inc_x + 0.15, bs_y + 0.52, inc_w - 0.30, 0.18,
-          "SQL Views & Transformations", font_size=7, bold=False, color=C_TEAL, align=PP_ALIGN.CENTER)
-
-# ── Materialized Views box ────────────────────────────────────────────────
-mv_y = bs_y + 0.75
-mv = add_rect(slide, inc_x + 0.15, mv_y, inc_w - 0.30, 0.50, RGBColor(0x02, 0x50, 0x70), C_WHITE, border_pt=1.0, radius=10000)
-set_text(mv, "Materialized Views  (PySpark / SQL)", font_size=9, bold=True, color=C_WHITE)
-
-# ── Presentation Tier box ─────────────────────────────────────────────────
-pt_y = mv_y + 0.65
-pt = add_rect(slide, inc_x + 0.15, pt_y, inc_w - 0.30, 0.45, C_TEAL, C_WHITE, border_pt=1.0, radius=10000)
-set_text(pt, "Incorta Presentation Tier", font_size=9, bold=True, color=C_WHITE)
-
-# ── CONSUMPTION & AI (col 4) ──────────────────────────────────────────────
-consumers = [
-    ("Dashboards &\nSelf-Service BI",  C_NAVY),
-    ("Power BI\nReports & Dashboard",  C_NAVY),
-    ("AgentForce\n(Salesforce AI)",    C_NAVY),
-    ("Salesforce\nAPI Integration",    C_NAVY),
+# ── Consumption boxes (4 rows, evenly distributed in same height band) ────────
+CONS_ITEMS = [
+    "Dashboards &\nSelf-Service BI",
+    "Power BI\nReports & Dashboard",
+    "AgentForce\n(Salesforce AI)",
+    "Salesforce\nAPI Integration",
 ]
-cons_x, cons_w, cons_h = 9.78, 3.35, 0.72
-cons_y_start = 1.10
+N_CON    = len(CONS_ITEMS)
+CON_H    = SRC_H
+# Space the 4 boxes evenly across the same H_CONTENT band
+CON_GAP  = (H_CONTENT - N_CON * CON_H) / (N_CON - 1)
 
-for i, (label, color) in enumerate(consumers):
-    y = cons_y_start + i * src_gap
-    b = add_rect(slide, cons_x, y, cons_w, cons_h, color, C_ICE, border_pt=1.2, radius=30000)
-    set_text(b, label, font_size=9, bold=True, color=C_WHITE)
+cons_y = []
+for i, label in enumerate(CONS_ITEMS):
+    y = Y_CONTENT + i * (CON_H + CON_GAP)
+    cons_y.append(y)
+    b = add_rect(slide, C4x, y, C4w, CON_H, C_NAVY, C_ICE, bpt=1.2, rounded=True)
+    txt(b, label, sz=9, bold=True, color=C_WHITE)
 
-# ── SECURITY bar at bottom ────────────────────────────────────────────────
-sec = add_rect(slide, 0.15, 7.02, W - 0.30, 0.32, C_SEC_BAR)
-set_text(sec, "🔒  Security · Governance · Data Lineage · Metadata Management",
-         font_size=8.5, bold=False, color=C_WHITE)
+# ── Incorta central box (full height) ────────────────────────────────────────
+add_rect(slide, C3x, Y_CONTENT, C3w, H_CONTENT, C_WHITE, C_TEAL, bpt=2.0, rounded=True)
 
-# ── CONNECTOR ARROWS & SQL / PYTHON SCRIPT LABELS ────────────────────────
-# Source → Connector arrows (horizontal)
-for i in range(5):
-    y_mid = src_y_start + i * src_gap + src_h / 2
-    add_arrow(slide, src_x + src_w, y_mid, con_x, y_mid, color=C_NAVY, width_pt=1.2)
+# Incorta title strip
+title_strip = add_rect(slide, C3x + 0.08, Y_CONTENT + 0.07, C3w - 0.16, 0.40, C_TEAL, rounded=True)
+txt(title_strip, "INCORTA", sz=13, bold=True, color=C_WHITE)
 
-# Connector → Incorta central arrows + SQL label
-for i in range(5):
-    y_mid = src_y_start + i * src_gap + src_h / 2
-    add_arrow(slide, con_x + con_w, y_mid, inc_x, y_mid, color=C_TEAL, width_pt=1.5)
-    # SQL label on the arrow midpoint
-    lbl_x = con_x + con_w + 0.03
-    add_label(slide, lbl_x, y_mid - 0.25, 0.75, 0.22,
-              "SQL", font_size=6.5, bold=True, color=C_GOLD)
+# ── ACDC Schema sub-box ───────────────────────────────────────────────────────
+AX = C3x + 0.12
+AY = Y_CONTENT + 0.57
+AW = C3w - 0.24
+AH = 2.55
 
-# Incorta → Consumption arrows + Python Script label
-cons_centers = [cons_y_start + i * src_gap + cons_h / 2 for i in range(4)]
-inc_right_x = inc_x + inc_w
-for i, y_mid in enumerate(cons_centers):
-    add_arrow(slide, inc_right_x, y_mid, cons_x, y_mid, color=C_NAVY, width_pt=1.5)
-    add_label(slide, inc_right_x + 0.03, y_mid - 0.25, 1.05, 0.22,
-              "Python / SQL", font_size=6.5, bold=True, color=C_GOLD)
+add_rect(slide, AX, AY, AW, AH, C_ICE, C_NAVY, bpt=1.5, rounded=True)
+lbl(slide, AX + 0.08, AY + 0.06, AW - 0.16, 0.26,
+    "ACDC Schema", sz=9, bold=True, color=C_NAVY, align=PP_ALIGN.CENTER)
 
-# ── Internal arrows within Incorta (ACDC → Business Schema → MV → Pres Tier)
-mid_x = inc_x + inc_w / 2
-# ACDC bottom → Business Schema
-acdc_bottom = acdc_y + acdc_h
-add_arrow(slide, mid_x, acdc_bottom, mid_x, bs_y, color=C_TEAL, width_pt=1.2)
-# Business Schema → MV
-add_arrow(slide, mid_x, bs_y + 0.50, mid_x, mv_y, color=C_TEAL, width_pt=1.2)
-# MV → Presentation Tier
-add_arrow(slide, mid_x, mv_y + 0.50, mid_x, pt_y, color=C_TEAL, width_pt=1.2)
+# Raw Data Tables
+rdt = add_rect(slide, AX + 0.12, AY + 0.38, AW - 0.24, 0.50, C_NAVY, C_WHITE, bpt=0.8, rounded=True)
+txt(rdt, "Raw Data Tables", sz=9, bold=True, color=C_WHITE)
 
-# ── Save ──────────────────────────────────────────────────────────────────
+# Golden Record & Customer Hierarchy — side by side NEW boxes
+NW = (AW - 0.36) / 2
+NY = AY + 1.02
+# Golden Record
+gr = add_rect(slide, AX + 0.12, NY, NW, 0.65, C_GREEN, C_WHITE, bpt=1.2, rounded=True)
+txt(gr, "Golden\nRecord", sz=9, bold=True, color=C_WHITE)
+lbl(slide, AX + 0.12, NY - 0.22, NW, 0.22, "★ NEW", sz=7.5, bold=True, color=C_GREEN, align=PP_ALIGN.CENTER)
+
+# Customer Hierarchy
+ch_x = AX + 0.12 + NW + 0.12
+ch = add_rect(slide, ch_x, NY, NW, 0.65, C_GREEN, C_WHITE, bpt=1.2, rounded=True)
+txt(ch, "Customer\nHierarchy", sz=9, bold=True, color=C_WHITE)
+lbl(slide, ch_x, NY - 0.22, NW, 0.22, "★ NEW", sz=7.5, bold=True, color=C_GREEN, align=PP_ALIGN.CENTER)
+
+# Python label below new boxes
+lbl(slide, AX + 0.08, NY + 0.70, AW - 0.16, 0.22,
+    "Populated via Python Script / PySpark",
+    sz=7.5, bold=False, color=C_TEAL, align=PP_ALIGN.CENTER)
+
+# ── Business Schema ────────────────────────────────────────────────────────────
+BS_Y = AY + AH + 0.22
+bs = add_rect(slide, C3x + 0.12, BS_Y, C3w - 0.24, 0.52, C_NAVY, C_WHITE, bpt=0.8, rounded=True)
+txt(bs, "Business Schema  (SQL Views & Transformations)", sz=9, bold=True, color=C_WHITE)
+
+# ── Materialized Views ─────────────────────────────────────────────────────────
+MV_Y = BS_Y + 0.68
+mv = add_rect(slide, C3x + 0.12, MV_Y, C3w - 0.24, 0.52, C_TEAL_DK, C_WHITE, bpt=0.8, rounded=True)
+txt(mv, "Materialized Views  (PySpark / SQL)", sz=9, bold=True, color=C_WHITE)
+
+# ── Presentation Tier ─────────────────────────────────────────────────────────
+PT_Y = MV_Y + 0.70
+pt = add_rect(slide, C3x + 0.12, PT_Y, C3w - 0.24, 0.52, C_TEAL, C_WHITE, bpt=0.8, rounded=True)
+txt(pt, "Incorta Presentation Tier", sz=9, bold=True, color=C_WHITE)
+
+# ── Security bar ──────────────────────────────────────────────────────────────
+sec = add_rect(slide, 0.10, Y_SEC, 13.13, H_SEC, C_SECBAR)
+txt(sec, "🔒  Security  ·  Governance  ·  Data Lineage  ·  Metadata Management",
+    sz=8.5, bold=False, color=C_WHITE)
+
+# ── Arrows: Source → Connector ────────────────────────────────────────────────
+for i in range(N_SRC):
+    y_mid = src_y[i] + SRC_H / 2
+    arrow(slide, C1x + C1w, y_mid, C2x, y_mid, color=C_SRC, wpt=1.2)
+
+# ── Arrows: Connector → Incorta  +  SQL labels ───────────────────────────────
+for i in range(N_SRC):
+    y_mid = src_y[i] + SRC_H / 2
+    arrow(slide, C2x + C2w, y_mid, C3x, y_mid, color=C_TEAL, wpt=1.5)
+    # SQL badge on the gap
+    lbl(slide, SQL_x - 0.20, y_mid - 0.26, 0.42, 0.20,
+        "SQL", sz=6.5, bold=True, color=C_GOLD, align=PP_ALIGN.CENTER)
+
+# ── Arrows: Incorta → Consumption  +  Python/SQL labels ──────────────────────
+for i in range(N_CON):
+    y_mid = cons_y[i] + CON_H / 2
+    arrow(slide, C3x + C3w, y_mid, C4x, y_mid, color=C_NAVY, wpt=1.5)
+    lbl(slide, PY_x - 0.22, y_mid - 0.26, 0.55, 0.20,
+        "SQL/Py", sz=6.0, bold=True, color=C_GOLD, align=PP_ALIGN.CENTER)
+
+# ── Internal Incorta vertical flow arrows ─────────────────────────────────────
+mid_x = C3x + C3w / 2
+# ACDC bottom → Business Schema top
+arrow(slide, mid_x, AY + AH, mid_x, BS_Y, color=C_TEAL, wpt=1.2)
+# Business Schema → Materialized Views
+arrow(slide, mid_x, BS_Y + 0.52, mid_x, MV_Y, color=C_TEAL, wpt=1.2)
+# Materialized Views → Presentation Tier
+arrow(slide, mid_x, MV_Y + 0.52, mid_x, PT_Y, color=C_TEAL, wpt=1.2)
+
+# ── Save ──────────────────────────────────────────────────────────────────────
 prs.save(OUTPUT)
-print(f"Saved: {OUTPUT}")
+print(f"Saved → {OUTPUT}")
